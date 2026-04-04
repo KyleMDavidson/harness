@@ -6,6 +6,10 @@
 #
 # The master agent HTTP service will be reachable at http://172.16.0.2:8080
 # from the host after a successful start.
+# -e causes set to return non-0 if cd fails
+# set sets the options for the shell
+# for historical reasons, zsh builtins continue with -<flag> turns it on, while +<flag> turns it off.
+# no standard across all utilities thouh - other utils may use other conventions. Only builtins follow this.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

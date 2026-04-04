@@ -4,21 +4,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
-ROOTFS_IMAGE="${ARTIFACTS_DIR}/rootfs.ext4"
-ROOTFS_SIZE_MB="${ROOTFS_SIZE_MB:-2048}"   # 2 GiB default; override with env var
-ALPINE_VERSION="${ALPINE_VERSION:-3.19}"
+# shellcheck source=config.env
+source "${SCRIPT_DIR}/config.env"
+
 ARCH="x86_64"
 ALPINE_MIRROR="https://dl-cdn.alpinelinux.org/alpine"
 ALPINE_MINI_URL="${ALPINE_MIRROR}/v${ALPINE_VERSION}/releases/${ARCH}/alpine-minirootfs-${ALPINE_VERSION}.0-${ARCH}.tar.gz"
-
-# Networking config written into the rootfs
-VM_IP="172.16.0.2"
-VM_GATEWAY="172.16.0.1"
-VM_NETMASK="255.255.255.0"
-VM_HOSTNAME="fc-agent"
-
-# Agent service settings
-AGENT_PORT="${AGENT_PORT:-8080}"
 
 require_root() {
     if [[ $EUID -ne 0 ]]; then

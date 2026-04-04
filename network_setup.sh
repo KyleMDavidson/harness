@@ -2,12 +2,12 @@
 # network_setup.sh — Create Linux bridge, tap device, and firewall rules for Firecracker VM
 set -euo pipefail
 
-BRIDGE="fcbr0"
-TAP="fctap0"
-BRIDGE_IP="172.16.0.1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
+# shellcheck source=config.env
+source "${SCRIPT_DIR}/config.env"
+
 BRIDGE_CIDR="${BRIDGE_IP}/24"
-VM_IP="172.16.0.2"
-HOST_IFACE="${HOST_IFACE:-$(ip route get 8.8.8.8 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev") print $(i+1)}' | head -1)}"
 
 usage() {
     echo "Usage: $0 [up|down]"

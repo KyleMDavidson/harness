@@ -5,26 +5,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
-
-# Socket path must match what setup_vm.sh passes to firecracker --api-sock
-FC_SOCKET="${FC_SOCKET:-/tmp/firecracker.socket}"
-
-# VM resources
-VM_VCPUS="${VM_VCPUS:-2}"
-VM_MEM_MB="${VM_MEM_MB:-512}"
-
-# Kernel & rootfs
-KERNEL_IMAGE="${KERNEL_IMAGE:-${ARTIFACTS_DIR}/vmlinux}"
-ROOTFS_IMAGE="${ROOTFS_IMAGE:-${ARTIFACTS_DIR}/rootfs.ext4}"
-
-# Networking (must match network_setup.sh)
-TAP_DEVICE="${TAP_DEVICE:-fctap0}"
-VM_MAC="${VM_MAC:-AA:FC:00:00:00:01}"
-VM_IP="172.16.0.2"
+# shellcheck source=config.env
+source "${SCRIPT_DIR}/config.env"
 
 # Kernel boot args — ttyS0 console, static IP via ip= parameter
 KERNEL_BOOT_ARGS="console=ttyS0 reboot=k panic=1 pci=off nomodules"
-KERNEL_BOOT_ARGS+=" ip=${VM_IP}::172.16.0.1:255.255.255.0::eth0:off"
+KERNEL_BOOT_ARGS+=" ip=${VM_IP}::${VM_GATEWAY}:${VM_NETMASK}::eth0:off"
 
 # Helper: send a PUT request to the Firecracker API via the Unix socket
 fc_put() {
@@ -114,12 +100,12 @@ EOF
 )"
 
     # 4. Network interface (tap -> VM eth0)
-    echo "[config] Attaching network interface (TAP: ${TAP_DEVICE}, MAC: ${VM_MAC})..."
+    echo "[config] Attaching network interface (TAP: ${TAP}, MAC: ${VM_MAC})..."
     fc_put "/network-interfaces/eth0" "$(cat <<EOF
 {
   "iface_id": "eth0",
   "guest_mac": "${VM_MAC}",
-  "host_dev_name": "${TAP_DEVICE}"
+  "host_dev_name": "${TAP}"
 }
 EOF
 )"
@@ -143,7 +129,7 @@ EOF
     echo "[config]   Kernel:   ${KERNEL_IMAGE}"
     echo "[config]   Rootfs:   ${ROOTFS_IMAGE}"
     echo "[config]   VM IP:    ${VM_IP}"
-    echo "[config]   TAP:      ${TAP_DEVICE}"
+    echo "[config]   TAP:      ${TAP}"
 }
 
 configure_vm

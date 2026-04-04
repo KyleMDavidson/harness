@@ -10,20 +10,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
-
-# ---- Tunables (override via environment) ----
-FC_BINARY="${FC_BINARY:-firecracker}"
-FC_SOCKET="${FC_SOCKET:-/tmp/firecracker.socket}"
-FC_PID_FILE="${FC_PID_FILE:-/tmp/firecracker.pid}"
-FC_LOG_FILE="${FC_LOG_FILE:-/tmp/fc-logs/firecracker-boot.log}"
-
-KERNEL_IMAGE="${KERNEL_IMAGE:-${ARTIFACTS_DIR}/vmlinux}"
-ROOTFS_IMAGE="${ROOTFS_IMAGE:-${ARTIFACTS_DIR}/rootfs.ext4}"
-
-VM_VCPUS="${VM_VCPUS:-2}"
-VM_MEM_MB="${VM_MEM_MB:-512}"
-VM_IP="172.16.0.2"
-AGENT_PORT="${AGENT_PORT:-8080}"
+# shellcheck source=config.env
+source "${SCRIPT_DIR}/config.env"
 
 # ---- Helpers ----
 

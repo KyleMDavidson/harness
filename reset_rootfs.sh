@@ -5,8 +5,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
-ROOTFS_IMAGE="${ROOTFS_IMAGE:-${ARTIFACTS_DIR}/rootfs.ext4}"
-FC_PID_FILE="${FC_PID_FILE:-/tmp/firecracker.pid}"
+# shellcheck source=config.env
+source "${SCRIPT_DIR}/config.env"
 
 require_root() {
     if [[ $EUID -ne 0 ]]; then

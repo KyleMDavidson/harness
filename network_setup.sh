@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # network_setup.sh — Create Linux bridge, tap device, and firewall rules for Firecracker VM
+
+# this is typical for production unix scripts
+# -o pipefail means any non-zero return from any command in the pipe exits immediately (pipefail is the option passed to the flag)
+# set -e means a failed cd returns non-zero, so causes pipe to exit
+# usually unix flags are either boolean or require an argument
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

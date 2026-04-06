@@ -1,3 +1,155 @@
+# Model          (VM lifecycle)
+[ Master ]  ─────────────→  [ Orchestrator ]
+     ↑                            ↓
+     │                        (start VM)
+     │                            ↓
+     │                        [ Firecracker VM ]
+     │                            ↑
+     └─────────────── HTTP ───────┘
+               (run tasks)
+
+
+The Master controls starting up / shutting down VMs via the Orchestrator.
+There are three distinct OS-level users in this system: `fc-master` (master),
+`fc-orch` (orchestrator) on the host, and `agent` inside each VM.
+Their scopes do not overlap.
+
+---
+
+## Host: `fc-master` (master process)
+
+The master is the application-level controller — it decides when to start or
+stop VMs and dispatches tasks to agents via HTTP. It has no special OS
+capabilities. It cannot touch the network interfaces, the Firecracker binary,
+or the VM images directly. Its only privileges are:
+
+1. The ability to invoke the orchestrator through a tightly scoped `sudo` rule
+   (just `setup_vm.sh`, nothing else).
+2. Network access to the VM subnet (`172.16.0.0/24`) to send HTTP requests.
+
+### Setup
+
+```bash
+# Create the user — no login shell, no home directory
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin fc-master
+
+# Allow fc-master to run only setup_vm.sh as fc-orch, no password, nothing else
+# Add this line via: sudo visudo -f /etc/sudoers.d/fc-master
+echo "fc-master ALL=(fc-orch) NOPASSWD: /home/kyle/harness/setup_vm.sh" \
+    | sudo tee /etc/sudoers.d/fc-master
+sudo chmod 440 /etc/sudoers.d/fc-master
+```
+
+Invoke the orchestrator from the master process like this:
+
+```bash
+sudo -u fc-orch /home/kyle/harness/setup_vm.sh start
+sudo -u fc-orch /home/kyle/harness/setup_vm.sh stop
+```
+
+### Capabilities & scope
+
+| Capability | fc-master |
+|---|---|
+| Read/write host filesystem | No — no home directory, no owned paths |
+| Modify network interfaces | No — no capabilities granted |
+| Start/stop VMs directly | No — must go through `setup_vm.sh` via sudo rule |
+| Invoke any other host script as fc-orch | No — sudo rule is scoped to `setup_vm.sh` only |
+| Send HTTP to VMs | Yes — normal network access to `172.16.0.0/24` |
+| Receive HTTP responses from VMs | Yes |
+
+---
+
+## Host: `fc-orch` (orchestrator process)
+
+Runs the orchestrator scripts (`setup_vm.sh`, etc.) on the host. Has no login
+shell and no home directory outside the harness. Its only job is to manage the
+Firecracker process and the host network interfaces that connect to VMs.
+
+### Setup
+
+```bash
+# Create the user
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin fc-orch
+
+# /dev/kvm access — required for Firecracker to start VMs
+sudo usermod -aG kvm fc-orch
+
+# CAP_NET_ADMIN on the firecracker binary only — allows creating bridge/TAP
+# without giving the user blanket root network access
+sudo setcap cap_net_admin+ep /usr/local/bin/firecracker
+
+# Own only the harness artifacts directory
+sudo chown -R fc-orch:fc-orch /home/kyle/harness/artifacts
+sudo chmod 750 /home/kyle/harness/artifacts
+
+# Dedicated socket directory, inaccessible to other users
+sudo mkdir -p /run/firecracker
+sudo chown fc-orch:fc-orch /run/firecracker
+sudo chmod 700 /run/firecracker
+```
+
+Update `config.env` to move the socket under that directory:
+
+```bash
+FC_SOCKET=/run/firecracker/firecracker.socket
+```
+
+Run the orchestrator as this user:
+
+```bash
+sudo -u fc-orch ./setup_vm.sh start
+```
+
+### Capabilities & scope
+
+| Capability | fc-orch |
+|---|---|
+| Read/write arbitrary host files | No — owns only `artifacts/` |
+| Modify the host OS / install packages | No — no sudo, no package manager access |
+| Spawn arbitrary processes | No — no login shell |
+| Create/destroy network interfaces | Yes — `CAP_NET_ADMIN` scoped to the firecracker binary |
+| Start/stop VMs | Yes — `/dev/kvm` group membership |
+| Communicate with VMs over HTTP | Yes — via bridge IP `172.16.0.1` |
+| Access VM filesystem directly | No — rootfs is an opaque file in `artifacts/` |
+
+---
+
+## Guest: `agent` (slave process inside each VM)
+
+Runs `server.py` inside the Firecracker VM. Created during `rootfs_build.sh`.
+Has no login shell and owns only `/home/agent`. It is entirely contained within
+the VM — it has no knowledge of or access to the host filesystem, host
+processes, or the Firecracker API socket.
+
+### Setup (performed automatically by `rootfs_build.sh`)
+
+```bash
+# Inside the VM (Alpine), during rootfs build:
+adduser -D -s /bin/bash -h /home/agent agent
+chown -R agent:agent /home/agent
+```
+
+The agent service is managed by OpenRC and runs as this user:
+
+```ini
+# /etc/init.d/agent (inside VM)
+command_user="agent"
+```
+
+### Capabilities & scope
+
+| Capability | agent |
+|---|---|
+| Access host filesystem | No — VM boundary enforced by Firecracker/KVM |
+| Access host processes or sockets | No |
+| Communicate with the host | Yes — HTTP only, via gateway `172.16.0.1` |
+| Write to VM filesystem | Yes — owns `/home/agent`, can write workspace files |
+| Install packages inside VM | Only if explicitly granted (not by default) |
+| Persist state across resets | Yes — until `reset_rootfs.sh` is run |
+
+
+
 # Agentic Coding Harness — VM Scripts Overview
 
 This directory contains four shell scripts that together provision and run a Firecracker microVM hosting a master agent HTTP service. The host communicates with the agent exclusively via HTTP on `http://172.16.0.2:8080`.

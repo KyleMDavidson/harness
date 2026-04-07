@@ -103,7 +103,8 @@ setup_venv() {
     echo "[install] Setting up Python venv for master..."
     local venv="${SCRIPT_DIR}/venv"
 
-    if [[ ! -d "$venv" ]]; then
+    if [[ ! -f "$venv/bin/pip" ]]; then
+        rm -rf "$venv"
         python3 -m venv "$venv"
         echo "[install]   Created venv at ${venv}"
     else
@@ -125,7 +126,7 @@ print_summary() {
     echo "=== Install complete ==="
     echo ""
     echo "To start the VM:"
-    echo "  sudo ANTHROPIC_API_KEY=\$ANTHROPIC_API_KEY ${SCRIPT_DIR}/setup_vm.sh start"
+    echo "  sudo ${SCRIPT_DIR}/setup_vm.sh start"
     echo ""
     echo "To run a task:"
     echo "  ${SCRIPT_DIR}/venv/bin/python ${SCRIPT_DIR}/master.py \"your task here\""

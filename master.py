@@ -76,6 +76,7 @@ async def main() -> None:
         options=ClaudeAgentOptions(
             allowed_tools=["Bash"],
             system_prompt=build_system_prompt(args.max_iterations),
+            permission_mode="bypassPermissions",
         ),
     ):
         if isinstance(message, ResultMessage):

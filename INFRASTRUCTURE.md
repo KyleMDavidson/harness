@@ -159,6 +159,20 @@ This directory contains four shell scripts that together provision and run a Fir
 
 ## Scripts
 
+### `install.sh` — One-time Host Setup
+
+Run once on a fresh host before anything else. Must be run as root.
+
+- Creates OS users `fc-master` and `fc-orch` (system users, no login shell).
+- Adds `fc-orch` to the `kvm` group for `/dev/kvm` access.
+- Sets `CAP_NET_ADMIN` on the Firecracker binary so `fc-orch` can manage network interfaces without full root.
+- Creates `/run/firecracker` (socket directory, owned by `fc-orch`).
+- Creates `artifacts/` (owned by `fc-orch`).
+- Writes `/etc/sudoers.d/fc-master` so `fc-master` can invoke `setup_vm.sh` via sudo.
+- Creates a Python venv at `harness/venv` and installs `claude-agent-sdk` into it.
+
+---
+
 ### `setup_vm.sh` — Orchestrator
 
 The top-level entrypoint. Run as root with `start`, `stop`, `restart`, or `status`.

@@ -83,16 +83,17 @@ One master, one VM, one slave. The master and slave have a direct 1:1 relationsh
 
 | Script | Run by | Purpose |
 |---|---|---|
-| `master.py` | `fc-master` | Application loop — drives the task |
-| `server.py` | `agent` (inside VM) | Slave — carries out tasks using Claude + tools |
-| `install.sh` | root | One-time host setup: OS users, venv, kvm group, sudo rules |
-| `setup_vm.sh` | root / `fc-orch` | VM lifecycle: start, stop, restart, status |
-| `stop.sh` | root | Kill Firecracker and tear down network (convenience wrapper) |
-| `network_setup.sh` | root / `fc-orch` | Bridge and TAP interface management |
-| `rootfs_build.sh` | root | Builds the ext4 guest image (atomic: builds to `.tmp`, renames on success) |
-| `configure_firecracker.sh` | root / `fc-orch` | Configures the VM via the Firecracker API socket |
-| `reset_rootfs.sh` | root | Deletes and rebuilds the rootfs image |
+| `install.sh` | root | **Run once on a fresh host.** Creates OS users, venv, kvm group, sudo rules. |
+| `rootfs_build.sh` | root | Builds the ext4 guest image (atomic: builds to `.tmp`, renames on success). Called automatically by `setup_vm.sh` if the image is missing. |
+| `setup_vm.sh` | root / `fc-orch` | VM lifecycle: start, stop, restart, status. Runs `network_setup.sh` and `rootfs_build.sh` as needed. |
+| `network_setup.sh` | root / `fc-orch` | Bridge and TAP interface management. Called by `setup_vm.sh`. |
+| `configure_firecracker.sh` | root / `fc-orch` | Configures the VM via the Firecracker API socket. Called by `setup_vm.sh`. |
+| `stop.sh` | root | Kill Firecracker and tear down network (convenience wrapper around `setup_vm.sh stop`). |
+| `reset_rootfs.sh` | root | Deletes and rebuilds the rootfs image. |
+| `status.sh` | any | Show current state: VM, slave health, master process. |
 | `test.sh` | root | Smoke test: start VM, verify slave health, test Claude auth, test round trip. Pass `--rebuild` to force a rootfs rebuild. |
+| `master.py` | `fc-master` | Application loop — drives the task. |
+| `server.py` | `agent` (inside VM) | Slave — carries out tasks using Claude + tools. |
 
 ---
 

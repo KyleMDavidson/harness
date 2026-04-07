@@ -9,7 +9,7 @@
                (run tasks)
 
 
-The Master controls starting up / shutting down VMs via the Orchestrator.
+The Master controls stauting up / shutting down VMs via the Orchestrator.
 There are three distinct OS-level users in this system: `fc-master` (master),
 `fc-orch` (orchestrator) on the host, and `agent` inside each VM.
 Their scopes do not overlap.
@@ -65,6 +65,7 @@ sudo -u fc-orch /home/kyle/harness/setup_vm.sh stop
 Runs the orchestrator scripts (`setup_vm.sh`, etc.) on the host. Has no login
 shell and no home directory outside the harness. Its only job is to manage the
 Firecracker process and the host network interfaces that connect to VMs.
+Needs access to taps and /dev/kvm, so this runs on the host OS
 
 ### Setup
 

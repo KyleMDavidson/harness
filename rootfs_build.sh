@@ -123,6 +123,12 @@ EOF
             procps
     "
 
+    echo "[rootfs] Installing Python dependencies..."
+    chroot "$mnt" /bin/sh -c "
+        set -e
+        pip3 install --break-system-packages anthropic
+    "
+
     # ---- Set up OpenRC for boot ----
     chroot "$mnt" /bin/sh -c "
         set -e
@@ -140,69 +146,26 @@ EOF
         chown -R agent:agent /home/agent
     "
 
-    # ---- Agent placeholder service script ----
+    # ---- Copy agent server ----
     mkdir -p "${mnt}/home/agent/agent"
-    cat > "${mnt}/home/agent/agent/server.py" <<'PYEOF'
-#!/usr/bin/env python3
-"""
-Master agent HTTP service — placeholder.
-Replace this with your actual agent implementation.
-"""
-import http.server
-import json
-import os
-import subprocess
-
-PORT = int(os.environ.get("AGENT_PORT", "8080"))
-
-class AgentHandler(http.server.BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        print(f"[agent] {self.address_string()} - {fmt % args}")
-
-    def send_json(self, code, payload):
-        body = json.dumps(payload).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def do_GET(self):
-        if self.path == "/health":
-            self.send_json(200, {"status": "ok"})
-        else:
-            self.send_json(404, {"error": "not found"})
-
-    def do_POST(self):
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length)
-        try:
-            data = json.loads(body)
-        except json.JSONDecodeError:
-            self.send_json(400, {"error": "invalid JSON"})
-            return
-
-        if self.path == "/run":
-            prompt = data.get("prompt", "")
-            # TODO: wire in your actual agent logic here
-            result = {"response": f"Echo: {prompt}"}
-            self.send_json(200, result)
-        else:
-            self.send_json(404, {"error": "not found"})
-
-if __name__ == "__main__":
-    server = http.server.HTTPServer(("0.0.0.0", PORT), AgentHandler)
-    print(f"[agent] Master agent listening on :{PORT}")
-    server.serve_forever()
-PYEOF
+    cp "${SCRIPT_DIR}/server.py" "${mnt}/home/agent/agent/server.py"
     chroot "$mnt" chown -R agent:agent /home/agent
+
+    # ---- OpenRC conf file (environment for the agent service) ----
+    if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+        echo "WARNING: ANTHROPIC_API_KEY is not set. The agent will fail to call Claude." >&2
+    fi
+    cat > "${mnt}/etc/conf.d/agent" <<EOF
+ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
+AGENT_PORT="${AGENT_PORT}"
+EOF
 
     # ---- OpenRC init script for the agent ----
     cat > "${mnt}/etc/init.d/agent" <<'INITEOF'
 #!/sbin/openrc-run
 
 name="agent"
-description="Master agent HTTP service"
+description="Agent HTTP service"
 command="/usr/bin/python3"
 command_args="/home/agent/agent/server.py"
 command_user="agent"
@@ -210,6 +173,10 @@ command_background="yes"
 pidfile="/run/${RC_SVCNAME}.pid"
 output_log="/var/log/agent.log"
 error_log="/var/log/agent.log"
+
+# Pass variables from /etc/conf.d/agent into the process environment
+export ANTHROPIC_API_KEY
+export AGENT_PORT
 
 depend() {
     need net

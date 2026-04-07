@@ -55,17 +55,18 @@ build_rootfs() {
         echo "[rootfs] Reusing cached Alpine tarball."
     fi
 
-    # ---- Create blank ext4 image ----
-    echo "[rootfs] Creating ${ROOTFS_SIZE_MB} MiB ext4 image at ${ROOTFS_IMAGE}..."
-    dd if=/dev/zero of="${ROOTFS_IMAGE}" bs=1M count="${ROOTFS_SIZE_MB}" status=progress
-    mkfs.ext4 -F -L "rootfs" "${ROOTFS_IMAGE}"
+    # ---- Create blank ext4 image (build to tmp, move on success) ----
+    local tmp_image="${ROOTFS_IMAGE}.tmp"
+    echo "[rootfs] Creating ${ROOTFS_SIZE_MB} MiB ext4 image..."
+    dd if=/dev/zero of="${tmp_image}" bs=1M count="${ROOTFS_SIZE_MB}" status=progress
+    mkfs.ext4 -F -L "rootfs" "${tmp_image}"
 
     # ---- Mount image ----
     local mnt
     mnt="$(mktemp -d /tmp/fc-rootfs-XXXXXX)"
-    trap "cleanup '${mnt}'" EXIT
+    trap "cleanup '${mnt}'; rm -f '${tmp_image}'" EXIT
 
-    mount -o loop "${ROOTFS_IMAGE}" "$mnt"
+    mount -o loop "${tmp_image}" "$mnt"
 
     # ---- Extract Alpine ----
     echo "[rootfs] Extracting Alpine minirootfs..."
@@ -110,7 +111,6 @@ EOF
         apk update
         apk add --no-cache \
             openrc \
-            busybox-initscripts \
             python3 \
             py3-pip \
             nodejs \
@@ -126,8 +126,33 @@ EOF
     echo "[rootfs] Installing Python dependencies..."
     chroot "$mnt" /bin/sh -c "
         set -e
-        pip3 install --break-system-packages anthropic
+        pip3 install --break-system-packages claude-agent-sdk
     "
+
+    echo "[rootfs] Installing Claude Code CLI..."
+    chroot "$mnt" /bin/sh -c "
+        set -e
+        npm install -g @anthropic-ai/claude-code
+    "
+
+    echo "[rootfs] Copying Claude Code credentials..."
+    local claude_src=""
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        local user_home
+        user_home="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+        claude_src="${user_home}/.claude"
+    else
+        claude_src="${HOME}/.claude"
+    fi
+    if [[ -d "$claude_src" ]]; then
+        mkdir -p "${mnt}/home/agent/.claude"
+        cp -r "$claude_src/." "${mnt}/home/agent/.claude/"
+        chroot "$mnt" chown -R agent:agent /home/agent/.claude
+        echo "[rootfs]   Credentials copied from ${claude_src}"
+    else
+        echo "[rootfs] WARNING: No Claude Code credentials found at ${claude_src}" >&2
+        echo "[rootfs]          The slave agent won't be able to authenticate." >&2
+    fi
 
     # ---- Set up OpenRC for boot ----
     chroot "$mnt" /bin/sh -c "
@@ -152,11 +177,7 @@ EOF
     chroot "$mnt" chown -R agent:agent /home/agent
 
     # ---- OpenRC conf file (environment for the agent service) ----
-    if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-        echo "WARNING: ANTHROPIC_API_KEY is not set. The agent will fail to call Claude." >&2
-    fi
     cat > "${mnt}/etc/conf.d/agent" <<EOF
-ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
 AGENT_PORT="${AGENT_PORT}"
 EOF
 
@@ -175,7 +196,6 @@ output_log="/var/log/agent.log"
 error_log="/var/log/agent.log"
 
 # Pass variables from /etc/conf.d/agent into the process environment
-export ANTHROPIC_API_KEY
 export AGENT_PORT
 
 depend() {
@@ -199,13 +219,21 @@ EOF
     # ---- Root password (change in production!) ----
     chroot "$mnt" /bin/sh -c "echo 'root:root' | chpasswd" 2>/dev/null || true
 
+    # ---- Unmount and promote to final path ----
+    for sub in proc sys dev/pts dev; do
+        umount "${mnt}/${sub}" 2>/dev/null || true
+    done
+    umount "$mnt"
+    rm -rf "$mnt"
+    trap - EXIT  # disarm trap — build succeeded
+
+    mv "${tmp_image}" "${ROOTFS_IMAGE}"
+
     echo "[rootfs] Build complete: ${ROOTFS_IMAGE}"
     echo "[rootfs]   Size:     ${ROOTFS_SIZE_MB} MiB"
     echo "[rootfs]   VM IP:    ${VM_IP}"
     echo "[rootfs]   Hostname: ${VM_HOSTNAME}"
     echo "[rootfs]   Agent:    http://${VM_IP}:${AGENT_PORT}"
-
-    # Cleanup is handled by trap
 }
 
 require_root

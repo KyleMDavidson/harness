@@ -21,7 +21,7 @@ AGENT_HOST = os.environ.get("AGENT_HOST", "172.16.0.2")
 AGENT_PORT = os.environ.get("AGENT_PORT", "8080")
 AGENT_URL = f"http://{AGENT_HOST}:{AGENT_PORT}"
 
-DEFAULT_MAX_ITERATIONS = 10
+DEFAULT_MAX_ITERATIONS = int(os.environ.get("MASTER_MAX_ITERATIONS", "10"))
 
 
 def build_system_prompt(max_iterations: int) -> str:

@@ -44,6 +44,7 @@ Two participants. The orchestrator is not involved here.
 - Uses the Claude Code Agent SDK with a single tool: `Bash`
 - Claude drives the loop — it curls `POST http://172.16.0.2:8080/run` to send steps to the slave, reviews the results, and decides when the task is done
 - Prints the final summary and exits
+- Accepts `--max-iterations N` (default 10). Because the master is a single Claude session, the limit is enforced via the system prompt — Claude self-regulates rather than being hard-stopped. For a guaranteed hard cutoff, the master would need to be restructured so each slave call is a discrete outer-loop iteration controlled by the host process.
 
 **`server.py`** (runs as `agent` inside the VM)
 - Listens on `0.0.0.0:8080`

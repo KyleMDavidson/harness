@@ -57,15 +57,18 @@ build_rootfs() {
 
     # ---- Create blank ext4 image (build to tmp, move on success) ----
     local tmp_image="${ROOTFS_IMAGE}.tmp"
+    rm -f "${tmp_image}"  # Remove any stale .tmp from a previous failed build
+
+    # Set trap before creating any files so cleanup always fires on failure
+    local mnt
+    mnt="$(mktemp -d /tmp/fc-rootfs-XXXXXX)"
+    trap "cleanup '${mnt}'; rm -f '${tmp_image}'" EXIT
+
     echo "[rootfs] Creating ${ROOTFS_SIZE_MB} MiB ext4 image..."
     dd if=/dev/zero of="${tmp_image}" bs=1M count="${ROOTFS_SIZE_MB}" status=progress
     mkfs.ext4 -F -L "rootfs" "${tmp_image}"
 
     # ---- Mount image ----
-    local mnt
-    mnt="$(mktemp -d /tmp/fc-rootfs-XXXXXX)"
-    trap "cleanup '${mnt}'; rm -f '${tmp_image}'" EXIT
-
     mount -o loop "${tmp_image}" "$mnt"
 
     # ---- Extract Alpine ----

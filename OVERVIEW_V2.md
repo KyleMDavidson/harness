@@ -40,18 +40,25 @@ Two participants. The orchestrator is not involved here.
 ```
 
 **`master.py`** (runs as `fc-master` on the host)
-- Takes a task description as input
-- Sends prompts to the slave via `POST http://172.16.0.2:8080/run`
-- Uses Claude (Opus 4.6) to review the slave's output and decide:
-  - Done → print result and exit
-  - Not done → compose a follow-up prompt and loop
-- Has a configurable iteration limit (`MAX_ITERATIONS`, default 10)
+- Takes a task description as input (CLI arg or stdin)
+- Uses the Claude Code Agent SDK with a single tool: `Bash`
+- Claude drives the loop — it curls `POST http://172.16.0.2:8080/run` to send steps to the slave, reviews the results, and decides when the task is done
+- Prints the final summary and exits
 
 **`server.py`** (runs as `agent` inside the VM)
 - Listens on `0.0.0.0:8080`
-- On `POST /run`, receives a prompt and runs its own Claude agentic loop
-- Has three tools: `bash`, `read_file`, `write_file` — all scoped to `/home/agent/workspace`
-- Returns Claude's final text response as `{"result": "..."}`
+- Endpoints: `GET /health` (liveness), `POST /run` (accepts `{"prompt": "..."}`, returns `{"result": "..."}`)
+- On `POST /run`, runs its own Claude Code Agent SDK loop with tools: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep` — all operating in `/home/agent/workspace`
+- Runs with `permission_mode="bypassPermissions"` (isolated inside the VM)
+
+---
+
+## Authentication
+
+Both master and slave use the **Claude Code CLI** via the Agent SDK — no `ANTHROPIC_API_KEY` needed. Authentication is via OAuth session tokens stored in `~/.claude/`.
+
+- **Master**: tokens in the invoking user's `~/.claude/` on the host
+- **Slave**: tokens copied from the invoking user's `~/.claude/` into the rootfs at build time (`/home/agent/.claude/`). Tokens will expire eventually; rebuild the rootfs to refresh them.
 
 ---
 
@@ -60,13 +67,13 @@ Two participants. The orchestrator is not involved here.
 One master, one VM, one slave. The master and slave have a direct 1:1 relationship. The orchestrator is purely transparent infrastructure.
 
 ```
-[ master.py ]  ←──────────────────────────────────────────────┐
-      │                                                        │
-      │  POST /run {"prompt": "..."}                          │
-      ↓                                                        │
-[ server.py ]  →  Claude loop (bash, read_file, write_file)   │
-      │                                                        │
-      └────────────────── {"result": "..."} ───────────────────┘
+[ master.py ]  ←──────────────────────────────────────────────────────────────┐
+      │                                                                        │
+      │  POST /run {"prompt": "..."}                                           │
+      ↓                                                                        │
+[ server.py ]  →  Claude loop (Bash, Read, Write, Edit, Glob, Grep)           │
+      │                                                                        │
+      └───────────────────────── {"result": "..."} ────────────────────────────┘
 ```
 
 ---
@@ -76,25 +83,38 @@ One master, one VM, one slave. The master and slave have a direct 1:1 relationsh
 | Script | Run by | Purpose |
 |---|---|---|
 | `master.py` | `fc-master` | Application loop — drives the task |
-| `server.py` | `agent` (inside VM) | Slave — implements tasks using Claude + tools |
-| `setup_vm.sh` | `fc-orch` | VM lifecycle: start, stop, restart, status |
-| `network_setup.sh` | `fc-orch` | Bridge and TAP interface management |
-| `rootfs_build.sh` | root | Builds the ext4 guest image (run once) |
-| `configure_firecracker.sh` | `fc-orch` | Configures the VM via the Firecracker API socket |
+| `server.py` | `agent` (inside VM) | Slave — carries out tasks using Claude + tools |
+| `install.sh` | root | One-time host setup: OS users, venv, kvm group, sudo rules |
+| `setup_vm.sh` | root / `fc-orch` | VM lifecycle: start, stop, restart, status |
+| `stop.sh` | root | Kill Firecracker and tear down network (convenience wrapper) |
+| `network_setup.sh` | root / `fc-orch` | Bridge and TAP interface management |
+| `rootfs_build.sh` | root | Builds the ext4 guest image (atomic: builds to `.tmp`, renames on success) |
+| `configure_firecracker.sh` | root / `fc-orch` | Configures the VM via the Firecracker API socket |
 | `reset_rootfs.sh` | root | Deletes and rebuilds the rootfs image |
+| `test.sh` | root | Smoke test: start VM, verify slave health, test Claude auth, test round trip. Pass `--rebuild` to force a rootfs rebuild. |
 
 ---
 
 ## Running a task
 
 ```bash
-# 1. Start the VM (once)
-export ANTHROPIC_API_KEY="sk-ant-..."
-sudo -u fc-orch ./setup_vm.sh start
+# 1. One-time setup (creates OS users, venv, etc.)
+sudo ./install.sh
 
-# 2. Run a task
-sudo -u fc-master python3 master.py "Write a Python function that parses JSON and handles errors"
+# 2. Start the VM
+sudo ./setup_vm.sh start
 
-# 3. Stop the VM when done
-sudo -u fc-orch ./setup_vm.sh stop
+# 3. Run a task
+./venv/bin/python master.py "Write a Python function that parses JSON and handles errors"
+
+# 4. Stop the VM when done
+sudo ./stop.sh
+```
+
+```bash
+# Smoke test (start fresh, verify everything works end-to-end)
+sudo ./test.sh
+
+# Force a rootfs rebuild (e.g. after changing server.py or credentials expired)
+sudo ./test.sh --rebuild
 ```

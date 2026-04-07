@@ -2,7 +2,7 @@
 # install.sh — One-time host setup for the Firecracker agentic harness.
 #
 # Creates OS users, sets capabilities, configures sudo, and installs
-# Python dependencies for the master process.
+# Bun and JS dependencies for the master process.
 #
 # Usage:
 #   sudo ./install.sh
@@ -97,26 +97,26 @@ setup_sudo() {
     echo "[install]   Wrote ${sudoers_file}"
 }
 
-# ---- Python venv for master.py ----
+# ---- Bun runtime ----
 
-setup_venv() {
-    echo "[install] Setting up Python venv for master..."
-    local venv="${SCRIPT_DIR}/venv"
-
-    if [[ ! -f "$venv/bin/pip" ]]; then
-        rm -rf "$venv"
-        python3 -m venv "$venv"
-        echo "[install]   Created venv at ${venv}"
+install_bun() {
+    echo "[install] Installing Bun..."
+    if command -v bun &>/dev/null; then
+        echo "[install]   Bun already installed: $(bun --version)"
     else
-        echo "[install]   Venv already exists at ${venv}"
+        curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash
+        echo "[install]   Bun installed: $(bun --version)"
     fi
+}
 
-    "$venv/bin/pip" install --quiet --upgrade pip
-    "$venv/bin/pip" install --quiet claude-agent-sdk
-    echo "[install]   Installed: claude-agent-sdk"
+# ---- JS dependencies for master.js ----
 
-    chown -R fc-master:fc-master "$venv"
-    echo "[install]   Ownership set to fc-master"
+install_js_deps() {
+    echo "[install] Installing JS dependencies..."
+    cd "${SCRIPT_DIR}"
+    bun install --frozen-lockfile 2>/dev/null || bun install
+    chown -R fc-master:fc-master "${SCRIPT_DIR}/node_modules" 2>/dev/null || true
+    echo "[install]   Installed: @anthropic-ai/claude-agent-sdk"
 }
 
 # ---- Summary ----
@@ -128,8 +128,12 @@ print_summary() {
     echo "To start the VM:"
     echo "  sudo ${SCRIPT_DIR}/setup_vm.sh start"
     echo ""
-    echo "To run a task:"
-    echo "  ${SCRIPT_DIR}/venv/bin/python ${SCRIPT_DIR}/master.py \"your task here\""
+    echo "To start the master:"
+    echo "  cd ${SCRIPT_DIR} && bun master.js"
+    echo ""
+    echo "To send a task:"
+    echo "  curl -X POST http://localhost:3000/run -H 'Content-Type: application/json' \\"
+    echo "       -d '{\"prompt\": \"your task here\"}'"
     echo ""
 }
 
@@ -140,5 +144,6 @@ setup_caps
 setup_socket_dir
 setup_artifacts_dir
 setup_sudo
-setup_venv
+install_bun
+install_js_deps
 print_summary

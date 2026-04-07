@@ -22,6 +22,7 @@ for arg in "$@"; do
 done
 
 AGENT_URL="http://${VM_IP}:${AGENT_PORT}"
+MASTER_URL="http://localhost:${MASTER_PORT}"
 PASS=0
 FAIL=0
 
@@ -86,16 +87,42 @@ fi
 
 echo ""
 echo "=== 4. Master → slave round trip ==="
-result=$("${SCRIPT_DIR}/venv/bin/python" "${SCRIPT_DIR}/master.py" \
-    "Send the slave a request asking it to reply with exactly the word ROUNDTRIP and nothing else. Report what it replied." \
-    2>&1) || true
 
-if echo "$result" | grep -qi "ROUNDTRIP"; then
-    pass "master → slave round trip"
+# Start master server in background
+cd "${SCRIPT_DIR}"
+bun master.js &>/tmp/master-test.log &
+MASTER_PID=$!
+trap "kill ${MASTER_PID} 2>/dev/null || true" EXIT
+
+# Wait for master /health
+master_ready=false
+for i in $(seq 1 10); do
+    if curl -sf --max-time 2 "${MASTER_URL}/health" >/dev/null 2>&1; then
+        master_ready=true
+        break
+    fi
+    sleep 1
+done
+
+if ! $master_ready; then
+    fail "master /health — did not start"
+    echo "  log: $(cat /tmp/master-test.log)"
 else
-    fail "master → slave round trip"
-    echo "  result: $result"
+    result=$(curl -sf --max-time 120 -X POST "${MASTER_URL}/run" \
+        -H 'Content-Type: application/json' \
+        -d '{"prompt": "Send the slave a request asking it to reply with exactly the word ROUNDTRIP and nothing else. Report what it replied."}' \
+        2>&1) || true
+
+    if echo "$result" | grep -qi "ROUNDTRIP"; then
+        pass "master → slave round trip"
+    else
+        fail "master → slave round trip"
+        echo "  result: $result"
+    fi
 fi
+
+kill "${MASTER_PID}" 2>/dev/null || true
+trap - EXIT
 
 # ---- Summary ----
 

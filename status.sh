@@ -35,8 +35,8 @@ fi
 
 # ---- Master process ----
 echo ""
-echo "Master (master.py):"
-master_pids=$(pgrep -f "master\.py" 2>/dev/null || true)
+echo "Master (master.js on port ${MASTER_PORT}):"
+master_pids=$(pgrep -f "master\.js" 2>/dev/null || true)
 if [[ -n "$master_pids" ]]; then
     while IFS= read -r pid; do
         cmdline=$(ps -p "$pid" -o args= 2>/dev/null || echo "(unknown)")

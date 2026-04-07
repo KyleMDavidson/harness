@@ -114,8 +114,6 @@ EOF
         apk update
         apk add --no-cache \
             openrc \
-            python3 \
-            py3-pip \
             nodejs \
             npm \
             git \
@@ -126,16 +124,10 @@ EOF
             procps
     "
 
-    echo "[rootfs] Installing Python dependencies..."
+    echo "[rootfs] Installing Node packages..."
     chroot "$mnt" /bin/sh -c "
         set -e
-        pip3 install --break-system-packages claude-agent-sdk
-    "
-
-    echo "[rootfs] Installing Claude Code CLI..."
-    chroot "$mnt" /bin/sh -c "
-        set -e
-        npm install -g @anthropic-ai/claude-code
+        npm install -g @anthropic-ai/claude-code @anthropic-ai/claude-agent-sdk
     "
 
     echo "[rootfs] Copying Claude Code credentials..."
@@ -176,7 +168,14 @@ EOF
 
     # ---- Copy agent server ----
     mkdir -p "${mnt}/home/agent/agent"
-    cp "${SCRIPT_DIR}/server.py" "${mnt}/home/agent/agent/server.py"
+    cp "${SCRIPT_DIR}/server.js" "${mnt}/home/agent/agent/server.js"
+    # package.json so Node resolves ESM imports from global node_modules
+    cat > "${mnt}/home/agent/agent/package.json" <<'EOF'
+{
+  "name": "agent",
+  "type": "module"
+}
+EOF
     chroot "$mnt" chown -R agent:agent /home/agent
 
     # ---- OpenRC conf file (environment for the agent service) ----
@@ -190,8 +189,8 @@ EOF
 
 name="agent"
 description="Agent HTTP service"
-command="/usr/bin/python3"
-command_args="/home/agent/agent/server.py"
+command="/usr/bin/node"
+command_args="/home/agent/agent/server.js"
 command_user="agent"
 command_background="yes"
 pidfile="/run/${RC_SVCNAME}.pid"

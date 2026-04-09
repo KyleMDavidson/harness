@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 # network_setup.sh — Create Linux bridge, tap device, and firewall rules for Firecracker VM
-
-# this is typical for production unix scripts
-# -o pipefail means any non-zero return from any command in the pipe exits immediately (pipefail is the option passed to the flag)
-# set -e means a failed cd returns non-zero, so causes pipe to exit
-# usually unix flags are either boolean or require an argument
+#
+# Environment variables (all optional, sourced from config.env):
+#   BRIDGE        Bridge interface name           (default: fcbr0)
+#   TAP           TAP device name                 (default: fctap0)
+#   BRIDGE_IP     Bridge IP (host side)           (default: 172.16.0.1)
+#   VM_IP         Guest IP (for display only)     (default: 172.16.0.2)
+#   HOST_IFACE    Host NIC for NAT/masquerade     (default: auto-detected via ip route)
+#
+# Arguments:
+#   up    Create bridge, tap, and firewall rules (default if omitted)
+#   down  Tear down bridge, tap, and firewall rules
+#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -4,12 +4,26 @@
 # Usage:
 #   sudo ./setup_vm.sh [start|stop|restart|status]
 #
-# The master agent HTTP service will be reachable at http://172.16.0.2:8080
+# The slave agent HTTP service will be reachable at http://${VM_IP}:${AGENT_PORT}
 # from the host after a successful start.
-# -e causes set to return non-0 if cd fails
-# set sets the options for the shell
-# for historical reasons, zsh builtins continue with -<flag> turns it on, while +<flag> turns it off.
-# no standard across all utilities thouh - other utils may use other conventions. Only builtins follow this.
+#
+# Environment variables (all optional, sourced from config.env):
+#   FC_BINARY       Firecracker binary name/path  (default: firecracker)
+#   FC_SOCKET       Firecracker API socket path   (default: /run/firecracker/firecracker.socket)
+#   FC_PID_FILE     PID file path                 (default: /tmp/firecracker.pid)
+#   FC_LOG_FILE     Log file path                 (default: /tmp/fc-logs/firecracker-boot.log)
+#   KERNEL_IMAGE    Path to vmlinux kernel        (default: artifacts/vmlinux)
+#   ROOTFS_IMAGE    Path to rootfs ext4 image     (default: artifacts/rootfs.ext4)
+#   VM_VCPUS        Number of vCPUs               (default: 2)
+#   VM_MEM_MB       Memory in MiB                 (default: 512)
+#   VM_IP           Guest IP address              (default: 172.16.0.2)
+#   AGENT_PORT      Slave HTTP port               (default: 8080)
+#
+# Arguments:
+#   start    Start the VM (default if omitted)
+#   stop     Gracefully halt the guest and tear down the network
+#   restart  stop then start
+#   status   Show VM state and slave health
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

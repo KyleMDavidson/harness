@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 # rootfs_build.sh — Build a minimal Alpine-based ext4 rootfs image for the Firecracker VM
+#
+# Environment variables (all optional, sourced from config.env):
+#   ROOTFS_IMAGE    Output image path         (default: artifacts/rootfs.ext4)
+#   ROOTFS_SIZE_MB  Image size in MiB         (default: 2048)
+#   ALPINE_VERSION  Alpine release to fetch   (default: 3.19)
+#   VM_IP           Static IP baked into rootfs         (default: 172.16.0.2)
+#   VM_NETMASK      Netmask baked into rootfs            (default: 255.255.255.0)
+#   VM_GATEWAY      Gateway baked into rootfs            (default: 172.16.0.1)
+#   VM_HOSTNAME     Hostname baked into rootfs           (default: fc-agent)
+#   AGENT_PORT      Slave HTTP port baked into rootfs    (default: 8080)
+#
+# Arguments: none
+#
+# Note: VM_IP, VM_NETMASK, VM_GATEWAY, VM_HOSTNAME, and AGENT_PORT are written
+# into the image at build time. Changing them after a build requires reset_rootfs.sh.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

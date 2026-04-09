@@ -5,6 +5,18 @@
  * Endpoints:
  *   GET  /health  — liveness check
  *   POST /run     — {"prompt": "...", "maxIterations": N} → {"result": "..."}
+ *
+ * Environment variables:
+ *   AGENT_HOST             Slave IP address          (default: 172.16.0.2)
+ *   AGENT_PORT             Slave HTTP port           (default: 8080)
+ *   MASTER_PORT            Port this server binds to (default: 3000)
+ *   MASTER_MAX_ITERATIONS  Default max slave calls per task (default: 20)
+ *
+ * Arguments: none (this is a long-running server; interact via HTTP)
+ *
+ * POST /run body fields:
+ *   prompt          string   required  The task to execute
+ *   maxIterations   number   optional  Override MASTER_MAX_ITERATIONS for this request
  */
 
 import { query } from "@anthropic-ai/claude-agent-sdk";

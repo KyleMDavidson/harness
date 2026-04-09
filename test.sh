@@ -1,13 +1,24 @@
 #!/usr/bin/env bash
 # test.sh — Smoke test for the harness.
 #
-# 1. Starts the VM (which starts the slave via OpenRC)
-# 2. Waits for the slave health endpoint
-# 3. Sends a minimal prompt to verify the slave can make an authenticated Claude request
-# 4. Runs the master with a minimal task to verify the full round trip
+# 1. Stops any running VM for a clean slate
+# 2. Starts the VM (which starts the slave via OpenRC)
+# 3. Waits for the slave health endpoint
+# 4. Sends a minimal prompt to verify the slave can make an authenticated Claude request
+# 5. Starts the master server, sends a round-trip task, verifies the response, stops the master
 #
 # Usage:
-#   sudo ./test.sh
+#   sudo ./test.sh [--rebuild]
+#
+# Environment variables (all optional, sourced from config.env):
+#   VM_IP           Slave IP address          (default: 172.16.0.2)
+#   AGENT_PORT      Slave HTTP port           (default: 8080)
+#   MASTER_PORT     Master HTTP port          (default: 3000)
+#   ROOTFS_IMAGE    Rootfs path (for --rebuild deletion)  (default: artifacts/rootfs.ext4)
+#   FC_LOG_FILE     Firecracker log (shown on slave timeout) (default: /tmp/fc-logs/firecracker-boot.log)
+#
+# Arguments:
+#   --rebuild   Delete rootfs.ext4 before starting, forcing a full rebuild
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

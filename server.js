@@ -6,6 +6,14 @@
  * Endpoints:
  *   GET  /health  — liveness check
  *   POST /run     — {"prompt": "..."} → {"result": "..."}
+ *
+ * Environment variables:
+ *   AGENT_PORT   Port this server binds to (default: 8080)
+ *
+ * Arguments: none
+ *
+ * POST /run body fields:
+ *   prompt   string   required  The task to execute
  */
 
 import { query } from "@anthropic-ai/claude-agent-sdk";

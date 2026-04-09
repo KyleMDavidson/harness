@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
-# configure_firecracker.sh — Configure a Firecracker VM via its API socket
+# configure_firecracker.sh — Configure a Firecracker VM via its API socket.
 # Must be called after the Firecracker process is started but before the VM boots.
+#
+# Environment variables (all optional, sourced from config.env):
+#   FC_SOCKET       Firecracker API socket path   (default: /run/firecracker/firecracker.socket)
+#   KERNEL_IMAGE    Path to vmlinux kernel        (default: artifacts/vmlinux)
+#   ROOTFS_IMAGE    Path to rootfs ext4 image     (default: artifacts/rootfs.ext4)
+#   VM_VCPUS        Number of vCPUs               (default: 2)
+#   VM_MEM_MB       Memory in MiB                 (default: 512)
+#   VM_IP           Guest IP (written to kernel boot args)  (default: 172.16.0.2)
+#   VM_GATEWAY      Guest gateway (written to kernel boot args) (default: 172.16.0.1)
+#   VM_NETMASK      Guest netmask (written to kernel boot args) (default: 255.255.255.0)
+#   TAP             TAP device to attach as guest eth0      (default: fctap0)
+#   VM_MAC          Guest MAC address                       (default: AA:FC:00:00:00:01)
+#
+# Arguments: none
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

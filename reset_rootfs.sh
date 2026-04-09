@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # reset_rootfs.sh — Wipe and rebuild the Firecracker rootfs image from scratch.
 # The VM must not be running when this is called.
+#
+# Environment variables (all optional, sourced from config.env):
+#   FC_PID_FILE     PID file used to check if VM is running  (default: /tmp/firecracker.pid)
+#   ROOTFS_IMAGE    Image to delete and rebuild              (default: artifacts/rootfs.ext4)
+#   + all variables consumed by rootfs_build.sh (ROOTFS_SIZE_MB, ALPINE_VERSION, VM_IP, etc.)
+#
+# Arguments: none
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

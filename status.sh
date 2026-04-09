@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # status.sh — Show the current state of the harness.
+#
+# Environment variables (all optional, sourced from config.env):
+#   FC_PID_FILE     Firecracker PID file      (default: /tmp/firecracker.pid)
+#   VM_IP           Slave IP address          (default: 172.16.0.2)
+#   AGENT_PORT      Slave HTTP port           (default: 8080)
+#   MASTER_PORT     Master HTTP port          (default: 3000)
+#
+# Arguments: none
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

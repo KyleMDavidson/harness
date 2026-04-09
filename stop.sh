@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # stop.sh — Stop any running Firecracker VMs and tear down the network.
+#
+# Environment variables (all optional, sourced from config.env):
+#   FC_PID_FILE     PID file path          (default: /tmp/firecracker.pid)
+#   FC_SOCKET       API socket path        (default: /run/firecracker/firecracker.socket)
+#
+# Arguments: none
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
